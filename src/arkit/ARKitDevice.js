@@ -7,7 +7,7 @@
  */
 import * as mat4 from 'gl-matrix/src/gl-matrix/mat4'
 
-import PolyfilledXRDevice from 'webxr-polyfill/src/devices/PolyfilledXRDevice'
+import XRDevice from 'webxr-polyfill/src/devices/XRDevice'
 
 import {throttle, throttledConsoleLog} from '../lib/throttle.js'
 
@@ -15,7 +15,7 @@ import ARKitWrapper from './ARKitWrapper.js'
 import ARKitWatcher from './ARKitWatcher.js'
 
 
-export default class ARKitDevice extends PolyfilledXRDevice {
+export default class ARKitDevice extends XRDevice {
 	constructor(global){
 		super(global)
 		this._throttledLogPose = throttle(this.logPose, 1000)
@@ -171,7 +171,7 @@ export default class ARKitDevice extends PolyfilledXRDevice {
 
 	requestFrameOfReferenceTransform(type, options){
 		var that = this
-        return new Promise((resolve, reject) => {
+		return new Promise((resolve, reject) => {
 			let enqueueOrExec = function (callback) {
 				if (that._baseFrameSet) {
 					callback()
@@ -181,12 +181,12 @@ export default class ARKitDevice extends PolyfilledXRDevice {
 			}
 
 			switch(type){
-				case 'head-model':
+				case 'local':
 					enqueueOrExec(function () { 
 						resolve(that._headModelMatrix) 
 					})
 					return
-				case 'eye-level':
+				case 'viewer':
 					enqueueOrExec(function () { 
 						resolve(that._eyeLevelMatrix) 
 					})
@@ -220,7 +220,7 @@ export default class ARKitDevice extends PolyfilledXRDevice {
 		target.y = 0
 		target.width = offsetWidth
 		target.height = offsetHeight
-		return true
+		return true 
 	}
 
 	getProjectionMatrix(eye){

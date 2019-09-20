@@ -7,7 +7,7 @@
  */
 
 import WebXRPolyfill from 'webxr-polyfill/src/WebXRPolyfill'
-import {PRIVATE} from 'webxr-polyfill/src/api/XRFrameOfReference'
+import {PRIVATE} from 'webxr-polyfill/src/api/XRReferenceSpace'
 
 import * as mat4 from 'gl-matrix/src/gl-matrix/mat4'
 import * as vec3 from 'gl-matrix/src/gl-matrix/vec3'
@@ -23,14 +23,14 @@ const _workingMatrix = mat4.create()
 const _workingMatrix2 = mat4.create()
 
 // Monkey patch the WebXR polyfill so that it only loads our special XRDevice
-WebXRPolyfill.prototype._patchRequestDevice = function(){
-	  var _arKitDevice = new ARKitDevice(this.global)
-		this.xr = new XR(new XRDevice(_arKitDevice))
-		this.xr._mozillaXRViewer = true
-    Object.defineProperty(this.global.navigator, 'xr', {
-      value: this.xr,
-      configurable: true,
-    })
+WebXRPolyfill.prototype._patchNavigatorXR = function() {
+	this.xr = new XR(Promise.resolve(new ARKitDevice(this.global)))
+	this.xr._mozillaXRViewer = true
+	Object.defineProperty(this.global.navigator, 'xr', {
+		value: this.xr,
+		configurable: true,
+	})
+	console.log('new polyfill')
 }
 
 let mobileIndex =  navigator.userAgent.indexOf("Mobile/") 
@@ -51,22 +51,6 @@ Now install a few proposed AR extensions to the WebXR Device API:
 - anchors: https://github.com/immersive-web/anchors
 */
 
-// Note from BLAIR:
-// I'm ALMOST POSITIVE this is wrong:  we can't assume frames of reference have
-// transforms, it's just that we are always giving absolute transforms in this patched
-// polyfill, and NOT treating "eye-level" and "head-model" the way they should be.
-// All of this will change when the polyfill is updated to the final spec.
-function _xrFrameOfReferenceGetTransformTo(otherFoR, out){
-	return _getTransformTo(this[PRIVATE].transform, otherFoR[PRIVATE].transform, out)
-}
-
-function _getTransformTo(sourceMatrix, destinationMatrix, out){
-	mat4.invert(_workingMatrix, destinationMatrix)
-	//let out = mat4.identity(mat4.create())
-	//mat4.multiply(out, _workingMatrix, out)
-	return mat4.multiply(out, sourceMatrix, _workingMatrix)
-}
-
 function _updateWorldSensingState (options) {
 	return _arKitWrapper.updateWorldSensingState(options)
 }
@@ -76,13 +60,15 @@ function _getWorldInformation () {
 }
 
 // This will be XRSession.requestHitTest
-async function _xrSessionRequestHitTest(origin, direction, coordinateSystem) {
+async function _xrSessionRequestHitTest(origin, direction, referenceSpace, viewerReferenceSpace, frame) {
 	// Promise<FrozenArray<XRHitResult>> requestHitTest(Float32Array origin, Float32Array direction, XRCoordinateSystem coordinateSystem);
 
 	// ARKit only handles hit testing from the screen, so only head model FoR is accepted
-	if(coordinateSystem.type !== 'head-model'){
+	/*
+	if(referenceSpace.type !== 'head-model'){
 		return Promise.reject('Only head-model hit testing is supported')
 	}
+	*/
 
 	if(origin[0] != 0.0 && origin[1] != 0.0 && origin[2] != 0.0) {
 		return Promise.reject('Platform only supports hit testing with ray origin = [0,0,0]')
@@ -101,19 +87,16 @@ async function _xrSessionRequestHitTest(origin, direction, coordinateSystem) {
 			// uncomment if you want one hit, and get rid of map below
 			// const hit = _arKitWrapper.pickBestHit(hits)
 
-			this.requestFrameOfReference('eye-level').then(eyeLevelFrameOfReference => {
-				eyeLevelFrameOfReference.getTransformTo(coordinateSystem, _workingMatrix)
-				//console.log('eye to head', mat4.getTranslation(vec3.create(), csTransform), mat4.getRotation(new Float32Array(4), csTransform))
-				resolve(hits.map(hit => {
-					mat4.multiply(_workingMatrix2, _workingMatrix, hit.world_transform)
-					//console.log('world transform', mat4.getTranslation(vec3.create(), hit.world_transform), mat4.getRotation(new Float32Array(4), hit.world_transform))
-					//console.log('head transform', mat4.getTranslation(vec3.create(), hitInHeadMatrix), mat4.getRotation(new Float32Array(4), hitInHeadMatrix))
-					return new XRHitResult(_workingMatrix2, hit, _arKitWrapper._timestamp)
-				}))
-			}).catch((...params) => {
-				console.error('Error testing for hits', ...params)
-				reject()
-			})
+			if (!frame.getViewerPose()) reject();
+
+			mat4.copy(_workingMatrix, frame.getPose(referenceSpace, viewerReferenceSpace));
+			//console.log('eye to head', mat4.getTranslation(vec3.create(), csTransform), mat4.getRotation(new Float32Array(4), csTransform))
+			resolve(hits.map(hit => {
+				mat4.multiply(_workingMatrix2, _workingMatrix, hit.world_transform)
+				//console.log('world transform', mat4.getTranslation(vec3.create(), hit.world_transform), mat4.getRotation(new Float32Array(4), hit.world_transform))
+				//console.log('head transform', mat4.getTranslation(vec3.create(), hitInHeadMatrix), mat4.getRotation(new Float32Array(4), hitInHeadMatrix))
+				return new XRHitResult(_workingMatrix2, hit, _arKitWrapper._timestamp)
+			}))
 		}).catch((...params) => {
 			console.error('Error testing for hits', ...params)
 			reject()
@@ -121,7 +104,7 @@ async function _xrSessionRequestHitTest(origin, direction, coordinateSystem) {
 	})
 }
 
-async function /*  Promise<XRAnchor> */ _addAnchor(value, frameOfReference) {
+async function /*  Promise<XRAnchor> */ _addAnchor(value, baseReferenceSpace, viewerReferenceSpace, frame) {
 	// value is either
 	//  	Float32Array modelMatrix, 
 	//		XRHitResult hitResult
@@ -159,30 +142,26 @@ async function /*  Promise<XRAnchor> */ _addAnchor(value, frameOfReference) {
 
 		} else if (value instanceof Float32Array) {
 			return new Promise((resolve, reject) => {
-				// need to get the data in eye-level reference frame.  In this polyfill,
-				// 
-				this.requestFrameOfReference('eye-level').then(eyeLevelFrameOfReference => {
-					frameOfReference.getTransformTo(eyeLevelFrameOfReference, _workingMatrix)
-					const anchorInWorldMatrix = mat4.multiply(mat4.create(), _workingMatrix, value)
+				mat4.copy(_workingMatrix, frame.getPose(viewerReferenceSpace, baseReferenceSpace).transform.matrix)
+				const anchorInWorldMatrix = mat4.multiply(mat4.create(), _workingMatrix, value)
 
-					_arKitWrapper.createAnchor(anchorInWorldMatrix).then(anchor => {
-						resolve(anchor)
+				_arKitWrapper.createAnchor(anchorInWorldMatrix).then(anchor => {
+					resolve(anchor)
 
-					// var anchor = new XRAnchor(anchorInWorldMatrix)
-					// _arKitWrapper.addAnchor(anchor.uid, anchor.modelMatrix()).then(detail => { 
-					// 	anchor.modelMatrix = detail.transform
-					// 	this._setAnchor(anchor)
-					// 	resolve(anchor)
-					}).catch((...params) => {
-						console.error('could not create anchor', ...params)
-						reject()
-					})
+				// var anchor = new XRAnchor(anchorInWorldMatrix)
+				// _arKitWrapper.addAnchor(anchor.uid, anchor.modelMatrix()).then(detail => { 
+				// 	anchor.modelMatrix = detail.transform
+				// 	this._setAnchor(anchor)
+				// 	resolve(anchor)
 				}).catch((...params) => {
-					console.error('could not create eye-level frame of reference', ...params)
+					console.error('could not create anchor', ...params)
 					reject()
 				})
-			});
-		}	else {
+			}).catch((...params) => {
+				console.error('could not create eye-level frame of reference', ...params)
+				reject()
+			})
+		} else {
 			return Promise.reject('invalid value passed to addAnchor', value)	
 		}
 }
@@ -296,8 +275,8 @@ function _installExtensions(){
 	if(window.XRFrame) {
 		Object.defineProperty(XRFrame.prototype, 'worldInformation', { get: _getWorldInformation });
 	}
-	if(window.XRFrameOfReference){
-		XRFrameOfReference.prototype.getTransformTo = _xrFrameOfReferenceGetTransformTo
+	if(window.XRReferenceSpace){
+		XRReferenceSpace.prototype.getTransformTo = _xrFrameOfReferenceGetTransformTo
 	}
 
 	// inject Polyfill globals {
