@@ -70,6 +70,8 @@
 
 			// handle input events from the XRInputManager
 			const inputManager = new XRInputManager((eventName, details) => {
+				if (!session) return;
+
 				switch (eventName) {
 					case 'normalized-touch':
 						coordinatesQueue.push([details.normalizedCoordinates[0], details.normalizedCoordinates[1]]);
@@ -81,24 +83,21 @@
 			});
 
 			const hitTestWithScreenCoordinates = (normalizedX, normalizedY, frame) => {
-				if(session === null){
-					console.log('No session for hit testing');
-					return Promise.reject();
-				}
 				// Convert the screen coordinates into head-model origin/direction for hit testing
 				const [origin, direction] = XRInputManager.convertScreenCoordinatesToRay(
 					normalizedX, normalizedY, engine.camera.projectionMatrix);
-				return session.requestHitTest(origin, direction, localReferenceSpace, viewerReferenceSpace, frame);
+				mat4.copy(workingMatrix, frame.getPose(viewerReferenceSpace, localReferenceSpace).transform.matrix);
+				return session.requestHitTest(origin, direction, workingMatrix);
 			};
 
 			const handleHitResults = (hits, frame) => {
 				let size = 0.05;
 				if (hits.length > 0) {
 					const hit = hits[0];
-					session.addAnchor(hit, localReferenceSpace, viewerReferenceSpace, frame).then(anchor => {					
+					session.addAnchor(hit).then(anchor => {
 						engine.addAnchoredNode(anchor, createSceneGraphNode());
 					}).catch(err => {
-						console.error('Error adding anchor', err)
+						console.error('Error adding anchor', err);
 					});
 				}
 			};
@@ -149,11 +148,11 @@
 				// get the location of the device, and use it to create an 
 				// anchor with the identity orientation
 				session.requestAnimationFrame(async (t, frame) => {
-					mat4.copy(workingMatrix, frame.getPose(viewerReferenceSpace, localReferenceSpace).transform.matrix);
+					mat4.copy(workingMatrix, frame.getPose(localReferenceSpace, viewerReferenceSpace).transform.matrix);
 					mat4.getTranslation(workingVec3, workingMatrix)
 					mat4.fromTranslation(workingMatrix, workingVec3)
 
-					const anchor = await session.addAnchor(workingMatrix, viewerReferenceSpace, viewerReferenceSpace, frame);
+					const anchor = await session.addAnchor(workingMatrix);
 					engine.addAnchoredNode(anchor, engine.root);
 				
 					// Kick off rendering
@@ -188,7 +187,7 @@
 
 				coordinatesQueue.length = 0;
 
-				const pose = frame.getViewerPose(viewerReferenceSpace);
+				const pose = frame.getViewerPose(localReferenceSpace);
 				if (!pose) {
 					console.log('No pose');
 					return;

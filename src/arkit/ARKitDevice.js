@@ -181,12 +181,12 @@ export default class ARKitDevice extends XRDevice {
 			}
 
 			switch(type){
-				case 'local':
+				case 'viewer':
 					enqueueOrExec(function () { 
 						resolve(that._headModelMatrix) 
 					})
 					return
-				case 'viewer':
+				case 'local':
 					enqueueOrExec(function () { 
 						resolve(that._eyeLevelMatrix) 
 					})

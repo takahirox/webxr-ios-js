@@ -31,6 +31,7 @@
 			import XREngine from '../XREngine.js';
 
 			let session = null;
+			let localReferenceSpace = null;
 			let viewerReferenceSpace = null;
 			let engine = null;
 			
@@ -79,7 +80,7 @@
 				// Set up the base layer
 				session.updateRenderState({baseLayer: new XRWebGLLayer(session, context)});
 
-				const localReferenceSpace = await session.requestReferenceSpace('local');
+				localReferenceSpace = await session.requestReferenceSpace('local');
 				viewerReferenceSpace = await session.requestReferenceSpace('viewer');
 
 				// Create a simple test scene and renderer
@@ -90,11 +91,11 @@
 				session.requestAnimationFrame(async (t, frame) => {
 					// get the location of the device, and use it to create an 
 					// anchor with the identity orientation
-					mat4.copy(workingMatrix, frame.getPose(viewerReferenceSpace, localReferenceSpace).transform.matrix);
+					mat4.copy(workingMatrix, frame.getPose(localReferenceSpace, viewerReferenceSpace).transform.matrix);
 					mat4.getTranslation(workingVec3, workingMatrix);
 					mat4.fromTranslation(workingMatrix, workingVec3);
 
-					const anchor = await session.addAnchor(workingMatrix, viewerReferenceSpace, viewerReferenceSpace, frame);
+					const anchor = await session.addAnchor(workingMatrix);
 					engine.addAnchoredNode(anchor, engine.root);
 
 					// Kick off rendering
@@ -116,7 +117,7 @@
 				if(!session || session.ended) return;
 
 				session.requestAnimationFrame(handleAnimationFrame);
-				const pose = frame.getViewerPose(viewerReferenceSpace);
+				const pose = frame.getViewerPose(localReferenceSpace);
 				if (!pose) {
 					console.log('No pose');
 					return;

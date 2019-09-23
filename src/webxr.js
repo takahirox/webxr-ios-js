@@ -7,7 +7,7 @@
  */
 
 import WebXRPolyfill from 'webxr-polyfill/src/WebXRPolyfill'
-import {PRIVATE} from 'webxr-polyfill/src/api/XRReferenceSpace'
+import {PRIVATE} from 'webxr-polyfill/src/api/XRFrame'
 
 import * as mat4 from 'gl-matrix/src/gl-matrix/mat4'
 import * as vec3 from 'gl-matrix/src/gl-matrix/vec3'
@@ -30,7 +30,6 @@ WebXRPolyfill.prototype._patchNavigatorXR = function() {
 		value: this.xr,
 		configurable: true,
 	})
-	console.log('new polyfill')
 }
 
 let mobileIndex =  navigator.userAgent.indexOf("Mobile/") 
@@ -60,7 +59,7 @@ function _getWorldInformation () {
 }
 
 // This will be XRSession.requestHitTest
-async function _xrSessionRequestHitTest(origin, direction, referenceSpace, viewerReferenceSpace, frame) {
+async function _xrSessionRequestHitTest(origin, direction, matrix) {
 	// Promise<FrozenArray<XRHitResult>> requestHitTest(Float32Array origin, Float32Array direction, XRCoordinateSystem coordinateSystem);
 
 	// ARKit only handles hit testing from the screen, so only head model FoR is accepted
@@ -87,15 +86,14 @@ async function _xrSessionRequestHitTest(origin, direction, referenceSpace, viewe
 			// uncomment if you want one hit, and get rid of map below
 			// const hit = _arKitWrapper.pickBestHit(hits)
 
-			if (!frame.getViewerPose()) reject();
+			//if (!frame.getViewerPose()) reject();
 
-			mat4.copy(_workingMatrix, frame.getPose(referenceSpace, viewerReferenceSpace));
 			//console.log('eye to head', mat4.getTranslation(vec3.create(), csTransform), mat4.getRotation(new Float32Array(4), csTransform))
 			resolve(hits.map(hit => {
-				mat4.multiply(_workingMatrix2, _workingMatrix, hit.world_transform)
+				mat4.multiply(_workingMatrix, matrix, hit.world_transform)
 				//console.log('world transform', mat4.getTranslation(vec3.create(), hit.world_transform), mat4.getRotation(new Float32Array(4), hit.world_transform))
 				//console.log('head transform', mat4.getTranslation(vec3.create(), hitInHeadMatrix), mat4.getRotation(new Float32Array(4), hitInHeadMatrix))
-				return new XRHitResult(_workingMatrix2, hit, _arKitWrapper._timestamp)
+				return new XRHitResult(_workingMatrix, hit, _arKitWrapper._timestamp)
 			}))
 		}).catch((...params) => {
 			console.error('Error testing for hits', ...params)
@@ -104,7 +102,7 @@ async function _xrSessionRequestHitTest(origin, direction, referenceSpace, viewe
 	})
 }
 
-async function /*  Promise<XRAnchor> */ _addAnchor(value, baseReferenceSpace, viewerReferenceSpace, frame) {
+async function /*  Promise<XRAnchor> */ _addAnchor(value) {
 	// value is either
 	//  	Float32Array modelMatrix, 
 	//		XRHitResult hitResult
@@ -142,10 +140,7 @@ async function /*  Promise<XRAnchor> */ _addAnchor(value, baseReferenceSpace, vi
 
 		} else if (value instanceof Float32Array) {
 			return new Promise((resolve, reject) => {
-				mat4.copy(_workingMatrix, frame.getPose(viewerReferenceSpace, baseReferenceSpace).transform.matrix)
-				const anchorInWorldMatrix = mat4.multiply(mat4.create(), _workingMatrix, value)
-
-				_arKitWrapper.createAnchor(anchorInWorldMatrix).then(anchor => {
+				_arKitWrapper.createAnchor(value).then(anchor => {
 					resolve(anchor)
 
 				// var anchor = new XRAnchor(anchorInWorldMatrix)
@@ -274,9 +269,28 @@ function _installExtensions(){
 	
 	if(window.XRFrame) {
 		Object.defineProperty(XRFrame.prototype, 'worldInformation', { get: _getWorldInformation });
-	}
-	if(window.XRReferenceSpace){
-		XRReferenceSpace.prototype.getTransformTo = _xrFrameOfReferenceGetTransformTo
+		window.XRFrame.prototype._getPose = window.XRFrame.prototype.getPose;
+		window.XRFrame.prototype.getPose = function (space, baseSpace) {
+			if (space._specialType === 'viewer' ||
+				space._specialType === 'target-ray' ||
+				space._specialType === 'grip') {
+				return this._getPose(space, baseSpace);
+			}
+
+			this[PRIVATE].viewerPose._updateFromReferenceSpace(baseSpace);
+			mat4.copy(_workingMatrix, this[PRIVATE].viewerPose.transform.matrix);
+
+			this[PRIVATE].viewerPose._updateFromReferenceSpace(space);
+			mat4.invert(_workingMatrix2, this[PRIVATE].viewerPose.transform.matrix);
+
+			const resultMatrix = mat4.create();
+			mat4.multiply(resultMatrix, _workingMatrix, _workingMatrix2); 
+
+			return new XRPose(
+				new XRRigidTransform(resultMatrix),
+				false
+			);
+		}
 	}
 
 	// inject Polyfill globals {
