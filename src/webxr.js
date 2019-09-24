@@ -69,7 +69,7 @@ function _getWorldInformation () {
  *       2. No XRCoordinateSyatem in the newest WebXR API and we should use XRReferenceSpace instead
  *       3. in the newest WebXR API we use XRFrame.getPose() to get the pose of space relative to baseSpace.
  *       Then adding the third argument frame {XRFrame} here as temporal workaround.
- *       We should update to follow the spec if the anchor spec is updated.
+ *       We should update to follow the spec if the hit test spec is updated.
  *
  * @param direction {Float32Array} @TODO: shoud be XRRay? 
  * @param referenceSpace {XRReferenceSpace}
