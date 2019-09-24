@@ -4387,39 +4387,46 @@ function _updateWorldSensingState (options) {
 function _getWorldInformation () {
 	 return  _arKitWrapper.getWorldInformation()
 }
-async function _xrSessionRequestHitTest(origin, direction, matrix) {
-	if(origin[0] != 0.0 && origin[1] != 0.0 && origin[2] != 0.0) {
-		return Promise.reject('Platform only supports hit testing with ray origin = [0,0,0]')
-	}
+async function _xrSessionRequestHitTest(direction, referenceSpace, frame) {
 	return new Promise((resolve, reject) => {
 		const normalizedScreenCoordinates = _convertRayToARKitScreenCoordinates(direction, _arKitWrapper._projectionMatrix);
 		_arKitWrapper.hitTest(...normalizedScreenCoordinates, ARKitWrapper.HIT_TEST_TYPE_EXISTING_PLANE_USING_GEOMETRY).then(hits => {
 			if(hits.length === 0) resolve([]);
-			resolve(hits.map(hit => {
-				multiply$14(_workingMatrix, matrix, hit.world_transform);
-				return new XRHitResult(_workingMatrix, hit, _arKitWrapper._timestamp)
-			}));
+			this.requestReferenceSpace('local').then(localReferenceSpace => {
+				copy$14(_workingMatrix, frame.getPose(referenceSpace, localReferenceSpace).transform.matrix);
+				resolve(hits.map(hit => {
+					multiply$14(_workingMatrix2, _workingMatrix, hit.world_transform);
+					return new XRHitResult(_workingMatrix, hit, _arKitWrapper._timestamp)
+				}));
+			}).catch((...params) => {
+				console.error('Error testing for hits', ...params);
+				reject();
+			});
 		}).catch((...params) => {
 			console.error('Error testing for hits', ...params);
 			reject();
 		});
 	})
 }
-async function                          _addAnchor(value) {
+async function _addAnchor(value, referenceSpace, frame) {
 	  if (value instanceof XRHitResult) {
 			return _arKitWrapper.createAnchorFromHit(value._hit)
 		} else if (value instanceof Float32Array) {
 			return new Promise((resolve, reject) => {
-				_arKitWrapper.createAnchor(value).then(anchor => {
-					resolve(anchor);
-				}).catch((...params) => {
-					console.error('could not create anchor', ...params);
-					reject();
+				this.requestReferenceSpace('local').then(localReferenceSpace => {
+					copy$14(_workingMatrix, frame.getPose(referenceSpace, localReferenceSpace).transform.matrix);
+					const anchorInWorldMatrix = multiply$14(create$14(), _workingMatrix, value);
+					_arKitWrapper.createAnchor(value).then(anchor => {
+						resolve(anchor);
+					}).catch((...params) => {
+						console.error('could not create anchor', ...params);
+						reject();
+					});
 				});
 			}).catch((...params) => {
 				console.error('could not create eye-level frame of reference', ...params);
 				reject();
-			})
+			});
 		} else {
 			return Promise.reject('invalid value passed to addAnchor', value)
 		}
