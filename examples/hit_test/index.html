@@ -86,15 +86,14 @@
 				// Convert the screen coordinates into head-model origin/direction for hit testing
 				const [origin, direction] = XRInputManager.convertScreenCoordinatesToRay(
 					normalizedX, normalizedY, engine.camera.projectionMatrix);
-				mat4.copy(workingMatrix, frame.getPose(viewerReferenceSpace, localReferenceSpace).transform.matrix);
-				return session.requestHitTest(origin, direction, workingMatrix);
+				return session.requestHitTest(direction, viewerReferenceSpace, frame);
 			};
 
 			const handleHitResults = (hits, frame) => {
 				let size = 0.05;
 				if (hits.length > 0) {
 					const hit = hits[0];
-					session.addAnchor(hit).then(anchor => {
+					session.addAnchor(hit, localReferenceSpace, frame).then(anchor => {
 						engine.addAnchoredNode(anchor, createSceneGraphNode());
 					}).catch(err => {
 						console.error('Error adding anchor', err);
@@ -152,7 +151,7 @@
 					mat4.getTranslation(workingVec3, workingMatrix)
 					mat4.fromTranslation(workingMatrix, workingVec3)
 
-					const anchor = await session.addAnchor(workingMatrix);
+					const anchor = await session.addAnchor(workingMatrix, localReferenceSpace, frame);
 					engine.addAnchoredNode(anchor, engine.root);
 				
 					// Kick off rendering

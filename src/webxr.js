@@ -58,20 +58,34 @@ function _getWorldInformation () {
 	 return  _arKitWrapper.getWorldInformation()
 }
 
+/**
+ * Note: Following the spec in https://github.com/immersive-web/anchors/blob/master/explainer.md
+ *       There seems being a newer spec https://github.com/immersive-web/hit-test/blob/master/hit-testing-explainer.md
+ *       but it requires a big change and doesn't seemd to be fixed. So using the older spec for now.
+ *
+ * Note: In the spec, requestHitTest() takes two arguments - XRRay and XRCoordinateSystem.
+ *       But _xrSessionRequestHitTest() takes three arguments - Float32Array, XRReferenceSpace, and XRFrame
+ *       Because 1. old implementation takes Float32Array instea of XRRay so just following that
+ *       2. No XRCoordinateSyatem in the newest WebXR API and we should use XRReferenceSpace instead
+ *       3. in the newest WebXR API we use XRFrame.getPose() to get the pose of space relative to baseSpace.
+ *       Then adding the third argument frame {XRFrame} here as temporal workaround.
+ *       We should update to follow the spec if the anchor spec is updated.
+ *
+ * @param direction {Float32Array} @TODO: shoud be XRRay? 
+ * @param referenceSpace {XRReferenceSpace}
+ * @param frame {XRFrame}
+ * @return {Promise<FrozenArray<XRHitResult>>}
+ */
 // This will be XRSession.requestHitTest
-async function _xrSessionRequestHitTest(origin, direction, matrix) {
-	// Promise<FrozenArray<XRHitResult>> requestHitTest(Float32Array origin, Float32Array direction, XRCoordinateSystem coordinateSystem);
-
+async function _xrSessionRequestHitTest(direction, referenceSpace, frame) {
 	// ARKit only handles hit testing from the screen, so only head model FoR is accepted
+	// Note: XRReferenceSpace doesn't have exposed type attribute now
+	//       so commenting out so far.
 	/*
 	if(referenceSpace.type !== 'head-model'){
 		return Promise.reject('Only head-model hit testing is supported')
 	}
 	*/
-
-	if(origin[0] != 0.0 && origin[1] != 0.0 && origin[2] != 0.0) {
-		return Promise.reject('Platform only supports hit testing with ray origin = [0,0,0]')
-	}
 
 	return new Promise((resolve, reject) => {
 		const normalizedScreenCoordinates = _convertRayToARKitScreenCoordinates(direction, _arKitWrapper._projectionMatrix)
@@ -86,15 +100,19 @@ async function _xrSessionRequestHitTest(origin, direction, matrix) {
 			// uncomment if you want one hit, and get rid of map below
 			// const hit = _arKitWrapper.pickBestHit(hits)
 
-			//if (!frame.getViewerPose()) reject();
-
-			//console.log('eye to head', mat4.getTranslation(vec3.create(), csTransform), mat4.getRotation(new Float32Array(4), csTransform))
-			resolve(hits.map(hit => {
-				mat4.multiply(_workingMatrix, matrix, hit.world_transform)
-				//console.log('world transform', mat4.getTranslation(vec3.create(), hit.world_transform), mat4.getRotation(new Float32Array(4), hit.world_transform))
-				//console.log('head transform', mat4.getTranslation(vec3.create(), hitInHeadMatrix), mat4.getRotation(new Float32Array(4), hitInHeadMatrix))
-				return new XRHitResult(_workingMatrix, hit, _arKitWrapper._timestamp)
-			}))
+			this.requestReferenceSpace('local').then(localReferenceSpace => {
+				mat4.copy(_workingMatrix, frame.getPose(referenceSpace, localReferenceSpace).transform.matrix);
+				//console.log('eye to head', mat4.getTranslation(vec3.create(), csTransform), mat4.getRotation(new Float32Array(4), csTransform))
+				resolve(hits.map(hit => {
+					mat4.multiply(_workingMatrix2, _workingMatrix, hit.world_transform)
+					//console.log('world transform', mat4.getTranslation(vec3.create(), hit.world_transform), mat4.getRotation(new Float32Array(4), hit.world_transform))
+					//console.log('head transform', mat4.getTranslation(vec3.create(), hitInHeadMatrix), mat4.getRotation(new Float32Array(4), hitInHeadMatrix))
+					return new XRHitResult(_workingMatrix, hit, _arKitWrapper._timestamp)
+				}))
+			}).catch((...params) => {
+				console.error('Error testing for hits', ...params)
+				reject()
+			});
 		}).catch((...params) => {
 			console.error('Error testing for hits', ...params)
 			reject()
@@ -102,11 +120,21 @@ async function _xrSessionRequestHitTest(origin, direction, matrix) {
 	})
 }
 
-async function /*  Promise<XRAnchor> */ _addAnchor(value) {
-	// value is either
-	//  	Float32Array modelMatrix, 
-	//		XRHitResult hitResult
-	// XRFrameOfReference frameOfReference
+/**
+ * Note: In the latest(09/24/2019) anchor spec
+ *       https://github.com/immersive-web/anchors/blob/master/explainer.md
+ *       XRSession.addAnchor() takes two arguments - pose and referenceSpace.
+ *       It might be out of date because in the newest WebXR spec
+ *       we use XRFrame.getPose() to get the pose of space relative to baseSpace.
+ *       Then adding the third argument frame {XRFrame} here as temporal workaround.
+ *       We should update to follow the spec if the anchor spec is updated.
+ *
+ * @param value {XRHitResult|Float32Arra}
+ * @param referenceSpace {XRReferenceSpace}
+ * @param frame {XRFrame}
+ * @return {Promise<XRAnchor>}
+ */
+async function _addAnchor(value, referenceSpace, frame) {
 	  if (value instanceof XRHitResult) {
 			return _arKitWrapper.createAnchorFromHit(value._hit)
 			// const hit = value._hit;
@@ -140,22 +168,29 @@ async function /*  Promise<XRAnchor> */ _addAnchor(value) {
 
 		} else if (value instanceof Float32Array) {
 			return new Promise((resolve, reject) => {
-				_arKitWrapper.createAnchor(value).then(anchor => {
-					resolve(anchor)
+				// need to get the data in eye-level reference frame.  In this polyfill,
+				// 
+				this.requestReferenceSpace('local').then(localReferenceSpace => {
+					mat4.copy(_workingMatrix, frame.getPose(referenceSpace, localReferenceSpace).transform.matrix);
+					const anchorInWorldMatrix = mat4.multiply(mat4.create(), _workingMatrix, value)
 
-				// var anchor = new XRAnchor(anchorInWorldMatrix)
-				// _arKitWrapper.addAnchor(anchor.uid, anchor.modelMatrix()).then(detail => { 
-				// 	anchor.modelMatrix = detail.transform
-				// 	this._setAnchor(anchor)
-				// 	resolve(anchor)
-				}).catch((...params) => {
-					console.error('could not create anchor', ...params)
-					reject()
-				})
+					_arKitWrapper.createAnchor(value).then(anchor => {
+						resolve(anchor)
+
+					// var anchor = new XRAnchor(anchorInWorldMatrix)
+					// _arKitWrapper.addAnchor(anchor.uid, anchor.modelMatrix()).then(detail => { 
+					// 	anchor.modelMatrix = detail.transform
+					// 	this._setAnchor(anchor)
+					// 	resolve(anchor)
+					}).catch((...params) => {
+						console.error('could not create anchor', ...params)
+						reject()
+					})
+				});
 			}).catch((...params) => {
 				console.error('could not create eye-level frame of reference', ...params)
 				reject()
-			})
+			});
 		} else {
 			return Promise.reject('invalid value passed to addAnchor', value)	
 		}
@@ -269,6 +304,10 @@ function _installExtensions(){
 	
 	if(window.XRFrame) {
 		Object.defineProperty(XRFrame.prototype, 'worldInformation', { get: _getWorldInformation });
+
+		// Note: WebXR polyfill doesn't support XRFrame.getPose() for
+		//       non viewer/target-ray/grip space yet (09/24/2019).
+		//       So supporting by ourselves for now.
 		window.XRFrame.prototype._getPose = window.XRFrame.prototype.getPose;
 		window.XRFrame.prototype.getPose = function (space, baseSpace) {
 			if (space._specialType === 'viewer' ||
@@ -276,6 +315,9 @@ function _installExtensions(){
 				space._specialType === 'grip') {
 				return this._getPose(space, baseSpace);
 			}
+
+			// Assuming both baseSpace and space are XRReferenceSpace.
+			// @TODO: Support XRSpace
 
 			this[PRIVATE].viewerPose._updateFromReferenceSpace(baseSpace);
 			mat4.copy(_workingMatrix, this[PRIVATE].viewerPose.transform.matrix);
