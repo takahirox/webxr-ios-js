@@ -4416,7 +4416,7 @@ async function _addAnchor(value, referenceSpace, frame) {
 				this.requestReferenceSpace('local').then(localReferenceSpace => {
 					copy$14(_workingMatrix, frame.getPose(referenceSpace, localReferenceSpace).transform.matrix);
 					const anchorInWorldMatrix = multiply$14(create$14(), _workingMatrix, value);
-					_arKitWrapper.createAnchor(value).then(anchor => {
+					_arKitWrapper.createAnchor(anchorInWorldMatrix).then(anchor => {
 						resolve(anchor);
 					}).catch((...params) => {
 						console.error('could not create anchor', ...params);
