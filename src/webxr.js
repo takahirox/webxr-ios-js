@@ -174,7 +174,7 @@ async function _addAnchor(value, referenceSpace, frame) {
 					mat4.copy(_workingMatrix, frame.getPose(referenceSpace, localReferenceSpace).transform.matrix);
 					const anchorInWorldMatrix = mat4.multiply(mat4.create(), _workingMatrix, value)
 
-					_arKitWrapper.createAnchor(value).then(anchor => {
+					_arKitWrapper.createAnchor(anchorInWorldMatrix).then(anchor => {
 						resolve(anchor)
 
 					// var anchor = new XRAnchor(anchorInWorldMatrix)
