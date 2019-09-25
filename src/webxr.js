@@ -65,7 +65,7 @@ function _getWorldInformation () {
  *
  * Note: In the spec, requestHitTest() takes two arguments - XRRay and XRCoordinateSystem.
  *       But _xrSessionRequestHitTest() takes three arguments - Float32Array, XRReferenceSpace, and XRFrame
- *       Because 1. old implementation takes Float32Array instea of XRRay so just following that
+ *       Because 1. old implementation takes Float32Array instead of XRRay so just following that
  *       2. No XRCoordinateSyatem in the newest WebXR API and we should use XRReferenceSpace instead
  *       3. in the newest WebXR API we use XRFrame.getPose() to get the pose of space relative to baseSpace.
  *       Then adding the third argument frame {XRFrame} here as temporal workaround.
