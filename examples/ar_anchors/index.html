@@ -134,11 +134,6 @@
 			};
 
 			const addAnchorInScreenCoordinates = (normalizedX, normalizedY, frame) => {
-				if (session === null) {
-					console.log('No session for adding anchor');
-					return;
-				}
-
 				// Convert the screen coordinates into head-model origin/direction for hit testing
 				const [origin, direction] = XRInputManager.convertScreenCoordinatesToRay(
 					normalizedX, normalizedY, engine.camera.projectionMatrix);
