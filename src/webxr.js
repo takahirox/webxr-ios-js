@@ -104,10 +104,10 @@ async function _xrSessionRequestHitTest(direction, referenceSpace, frame) {
 				mat4.copy(_workingMatrix, frame.getPose(referenceSpace, localReferenceSpace).transform.matrix);
 				//console.log('eye to head', mat4.getTranslation(vec3.create(), csTransform), mat4.getRotation(new Float32Array(4), csTransform))
 				resolve(hits.map(hit => {
-					mat4.multiply(_workingMatrix2, _workingMatrix, hit.world_transform)
+					mat4.multiply(_workingMatrix2, hit.world_transform, _workingMatrix);
 					//console.log('world transform', mat4.getTranslation(vec3.create(), hit.world_transform), mat4.getRotation(new Float32Array(4), hit.world_transform))
 					//console.log('head transform', mat4.getTranslation(vec3.create(), hitInHeadMatrix), mat4.getRotation(new Float32Array(4), hitInHeadMatrix))
-					return new XRHitResult(_workingMatrix, hit, _arKitWrapper._timestamp)
+					return new XRHitResult(_workingMatrix2, hit, _arKitWrapper._timestamp)
 				}))
 			}).catch((...params) => {
 				console.error('Error testing for hits', ...params)
@@ -171,18 +171,16 @@ async function _addAnchor(value, referenceSpace, frame) {
 				// need to get the data in eye-level reference frame.  In this polyfill,
 				// 
 				this.requestReferenceSpace('local').then(localReferenceSpace => {
-					mat4.copy(_workingMatrix, frame.getPose(referenceSpace, localReferenceSpace).transform.matrix);
+					mat4.copy(_workingMatrix, frame.getPose(localReferenceSpace, referenceSpace).transform.matrix);
 					const anchorInWorldMatrix = mat4.multiply(mat4.create(), _workingMatrix, value)
 
-					_arKitWrapper.createAnchor(anchorInWorldMatrix).then(anchor => {
-						resolve(anchor)
-
+					_arKitWrapper.createAnchor(anchorInWorldMatrix).then(resolve)
 					// var anchor = new XRAnchor(anchorInWorldMatrix)
 					// _arKitWrapper.addAnchor(anchor.uid, anchor.modelMatrix()).then(detail => { 
 					// 	anchor.modelMatrix = detail.transform
 					// 	this._setAnchor(anchor)
 					// 	resolve(anchor)
-					}).catch((...params) => {
+					.catch((...params) => {
 						console.error('could not create anchor', ...params)
 						reject()
 					})
@@ -310,7 +308,7 @@ function _installExtensions(){
 		//       So supporting by ourselves for now.
 		window.XRFrame.prototype._getPose = window.XRFrame.prototype.getPose;
 		window.XRFrame.prototype.getPose = function (space, baseSpace) {
-			if (space._specialType === 'viewer' ||
+			if (/*space._specialType === 'viewer' ||*/ // Note: seems like polyfill works wrongly for viewer?
 				space._specialType === 'target-ray' ||
 				space._specialType === 'grip') {
 				return this._getPose(space, baseSpace);
@@ -319,11 +317,8 @@ function _installExtensions(){
 			// Assuming both baseSpace and space are XRReferenceSpace.
 			// @TODO: Support XRSpace
 
-			this[PRIVATE].viewerPose._updateFromReferenceSpace(baseSpace);
-			mat4.copy(_workingMatrix, this[PRIVATE].viewerPose.transform.matrix);
-
-			this[PRIVATE].viewerPose._updateFromReferenceSpace(space);
-			mat4.invert(_workingMatrix2, this[PRIVATE].viewerPose.transform.matrix);
+			mat4.copy(_workingMatrix, this.getViewerPose(baseSpace).transform.matrix);
+			mat4.invert(_workingMatrix2, this.getViewerPose(space).transform.matrix);
 
 			const resultMatrix = mat4.create();
 			mat4.multiply(resultMatrix, _workingMatrix, _workingMatrix2); 
