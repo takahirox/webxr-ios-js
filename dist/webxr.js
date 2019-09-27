@@ -4395,8 +4395,8 @@ async function _xrSessionRequestHitTest(direction, referenceSpace, frame) {
 			this.requestReferenceSpace('local').then(localReferenceSpace => {
 				copy$14(_workingMatrix, frame.getPose(referenceSpace, localReferenceSpace).transform.matrix);
 				resolve(hits.map(hit => {
-					multiply$14(_workingMatrix2, _workingMatrix, hit.world_transform);
-					return new XRHitResult(_workingMatrix, hit, _arKitWrapper._timestamp)
+					multiply$14(_workingMatrix2, hit.world_transform, _workingMatrix);
+					return new XRHitResult(_workingMatrix2, hit, _arKitWrapper._timestamp)
 				}));
 			}).catch((...params) => {
 				console.error('Error testing for hits', ...params);
@@ -4414,11 +4414,10 @@ async function _addAnchor(value, referenceSpace, frame) {
 		} else if (value instanceof Float32Array) {
 			return new Promise((resolve, reject) => {
 				this.requestReferenceSpace('local').then(localReferenceSpace => {
-					copy$14(_workingMatrix, frame.getPose(referenceSpace, localReferenceSpace).transform.matrix);
+					copy$14(_workingMatrix, frame.getPose(localReferenceSpace, referenceSpace).transform.matrix);
 					const anchorInWorldMatrix = multiply$14(create$14(), _workingMatrix, value);
-					_arKitWrapper.createAnchor(anchorInWorldMatrix).then(anchor => {
-						resolve(anchor);
-					}).catch((...params) => {
+					_arKitWrapper.createAnchor(anchorInWorldMatrix).then(resolve)
+					.catch((...params) => {
 						console.error('could not create anchor', ...params);
 						reject();
 					});
@@ -4490,15 +4489,13 @@ function _installExtensions(){
 		Object.defineProperty(XRFrame.prototype, 'worldInformation', { get: _getWorldInformation });
 		window.XRFrame.prototype._getPose = window.XRFrame.prototype.getPose;
 		window.XRFrame.prototype.getPose = function (space, baseSpace) {
-			if (space._specialType === 'viewer' ||
+			if (
 				space._specialType === 'target-ray' ||
 				space._specialType === 'grip') {
 				return this._getPose(space, baseSpace);
 			}
-			this[PRIVATE$7].viewerPose._updateFromReferenceSpace(baseSpace);
-			copy$14(_workingMatrix, this[PRIVATE$7].viewerPose.transform.matrix);
-			this[PRIVATE$7].viewerPose._updateFromReferenceSpace(space);
-			invert$9(_workingMatrix2, this[PRIVATE$7].viewerPose.transform.matrix);
+			copy$14(_workingMatrix, this.getViewerPose(baseSpace).transform.matrix);
+			invert$9(_workingMatrix2, this.getViewerPose(space).transform.matrix);
 			const resultMatrix = create$14();
 			multiply$14(resultMatrix, _workingMatrix, _workingMatrix2);
 			return new XRPose(
