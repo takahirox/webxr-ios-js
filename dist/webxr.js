@@ -2732,18 +2732,27 @@ class XRHitResult {
 
 class XRImageAnchor extends XRAnchor {}
 
-class XRLightEstimate {
-	constructor(){
-		this._ambientLightIntensity = 1;
+const PRIVATE$18 = Symbol('@@webxr-polyfill/XRLightProbe');
+class XRLightProbe {
+	constructor(options = {}){
+		this[PRIVATE$18] = {
+			indirectIrradiance: options.indirectIrradiance
+		};
 	}
-	set ambientIntensity(value){
-		this._ambientLightIntensity = value / 1000;
+	get indirectIrradiance() {
+		return this[PRIVATE$18].indirectIrradiance;
 	}
-	get ambientIntensity(){
-		return this._ambientLightIntensity
+	get primaryLightDirection() {
+		throw new Error('Not implemented');
 	}
-	getAmbientColorTemperature(){
-		throw new Error('Not implemented')
+	get primaryLightIntensity() {
+		throw new Error('Not implemented');
+	}
+	get sphericalHarmonicsCoefficients() {
+		throw new Error('Not implemented');
+	}
+	get sphericalHarmonicsOrientation() {
+		throw new Error('Not implemented');
 	}
 }
 
@@ -3158,7 +3167,7 @@ var API$1 = {
     XRFaceMesh,
     XRHitResult,
     XRImageAnchor,
-    XRLightEstimate,
+    XRLightProbe,
     XRMesh,
     XRPlaneMesh,
     XRVideoFrame
@@ -3250,7 +3259,7 @@ class ARKitWrapper extends EventTarget {
 			throw new Error('ARKitWrapper is a singleton. Use ARKitWrapper.GetOrCreate() to get the global instance.')
 		}
 		this._timestamp = 0;
-		this._lightIntensity = new XRLightEstimate();
+		this._lightProbe = null;
 		this._deviceId = null;
 		this._isWatching = false;
 		this._waitingForSessionStart = false;
@@ -3267,7 +3276,6 @@ class ARKitWrapper extends EventTarget {
 			worldAccess: false
 		};
 		this._worldSensingState = {
-			illuminationDetectionState: false,
 			meshDetectionState: false
 		};
 		this._worldInformation = null;
@@ -3707,6 +3715,15 @@ class ARKitWrapper extends EventTarget {
 					});
 		})
 	}
+	getLightProbe() {
+		return new Promise((resolve, reject) => {
+			if (this._lightProbe) {
+				resolve(this._lightProbe);
+			} else {
+				reject(new Error('Not populated yet'));
+			}
+		});
+	}
 	stop(){
 		return new Promise((resolve, reject) => {
 			if (!this._isWatching){
@@ -3845,11 +3862,6 @@ class ARKitWrapper extends EventTarget {
 		}
 	}
 	updateWorldSensingState(options) {
-		if (options.hasOwnProperty("illuminationDetectionState") && this._currentPermissions.worldAccess) {
-			this._worldSensingState.illuminationDetectionState = options.illuminationDetectionState.enabled || false;
-		} else {
-			this._worldSensingState.illuminationDetectionState = false;
-		}
 		if (options.hasOwnProperty("meshDetectionState") && this._currentPermissions.worldAccess) {
 			this._worldSensingState.meshDetectionState = options.meshDetectionState.enabled || false;
 		} else {
@@ -3862,9 +3874,6 @@ class ARKitWrapper extends EventTarget {
 			return this._worldInformation
 		}
 		let state = {};
-		if (this._worldSensingState.illuminationDetectionState) {
-			state.estimatedLight = this._lightIntensity;
-		}
 		if (this._worldSensingState.meshDetectionState) {
 			state.meshes = [];
 			this._anchors.forEach(anchor => {
@@ -3923,7 +3932,9 @@ class ARKitWrapper extends EventTarget {
 		var plane, anchor;
 		this._worldInformation = null;
 		this._timestamp = this._adjustARKitTime(data.timestamp);
-		this._lightIntensity.ambientIntensity = data.light_intensity;
+		this._lightProbe = new XRLightProbe({
+			indirectIrradiance: data.light_intensity / 1000
+		});
 		copy$14(this._cameraTransform, data.camera_transform);
 		copy$14(this._viewMatrix, data.camera_view);
 		copy$14(this._projectionMatrix, data.projection_camera);
@@ -4487,8 +4498,8 @@ function _installExtensions(){
 	}
 	if(window.XRFrame) {
 		Object.defineProperty(XRFrame.prototype, 'worldInformation', { get: _getWorldInformation });
-		window.XRFrame.prototype._getPose = window.XRFrame.prototype.getPose;
-		window.XRFrame.prototype.getPose = function (space, baseSpace) {
+		XRFrame.prototype._getPose = window.XRFrame.prototype.getPose;
+		XRFrame.prototype.getPose = function (space, baseSpace) {
 			if (
 				space._specialType === 'target-ray' ||
 				space._specialType === 'grip') {
@@ -4502,6 +4513,12 @@ function _installExtensions(){
 				new XRRigidTransform(resultMatrix),
 				false
 			);
+		};
+		XRFrame.prototype.getGlobalLightEstimate = function () {
+			return _arKitWrapper.getLightProbe();
+		};
+		XRFrame.prototype.getGlobalReflectionProbe = function () {
+			throw new Error('Not implemented');
 		};
 	}
 	for (const className of Object.keys(API$1)) {
