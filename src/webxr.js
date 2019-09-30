@@ -288,7 +288,6 @@ function _installExtensions(){
 		// XRSession.prototype._deleteAnchor = _deleteAnchor
 		XRSession.prototype.removeAnchor = _removeAnchor
 
-
 		// use "nonStandard" to signify these are unlikely to be standardized 
 		XRSession.prototype.nonStandard_createDetectionImage = _createDetectionImage
 		XRSession.prototype.nonStandard_destroyDetectionImage = _destroyDetectionImage
@@ -306,8 +305,8 @@ function _installExtensions(){
 		// Note: WebXR polyfill doesn't support XRFrame.getPose() for
 		//       non viewer/target-ray/grip space yet (09/24/2019).
 		//       So supporting by ourselves for now.
-		window.XRFrame.prototype._getPose = window.XRFrame.prototype.getPose;
-		window.XRFrame.prototype.getPose = function (space, baseSpace) {
+		XRFrame.prototype._getPose = window.XRFrame.prototype.getPose;
+		XRFrame.prototype.getPose = function (space, baseSpace) {
 			if (/*space._specialType === 'viewer' ||*/ // Note: seems like polyfill works wrongly for viewer?
 				space._specialType === 'target-ray' ||
 				space._specialType === 'grip') {
@@ -328,6 +327,17 @@ function _installExtensions(){
 				false
 			);
 		}
+
+		// Add lighting-estimate API
+		// Specification: https://github.com/immersive-web/lighting-estimation
+
+		XRFrame.prototype.getGlobalLightEstimate = function () {
+			return _arKitWrapper.getLightProbe();
+		};
+
+		XRFrame.prototype.getGlobalReflectionProbe = function () {
+			throw new Error('Not implemented');
+		};
 	}
 
 	// inject Polyfill globals {

@@ -55,14 +55,6 @@
 			let ambientLight = null;
 			let directionalLight = null;
 
-			const updateScene = frame => {
-				if (frame.worldInformation.estimatedLight) {
-					const ambientIntensity = frame.worldInformation.estimatedLight.ambientIntensity;
-					ambientLight.intensity = ambientIntensity;
-					directionalLight.intensity = ambientIntensity * 0.5;
-				}
-			};
-
 			// handle hit testing slightly differently than other samples, since we're doing
 			// it per frame.  The "boiler plate" code below is slightly different, setting 
 			// requestNextHit on tap instead of executing the hit test.  The custom XREngineHits
@@ -112,9 +104,8 @@
 
 			document.getElementById('go-button').addEventListener('click', event => {
 				if (!session) {
-					// @TODO: fix me
 					navigator.xr.requestSession({
-						worldSensing: true
+						xrCompatible: true
 					})
 					.then(handleSessionStarted)
 					.catch(err => console.error('Session setup error', err));
@@ -161,12 +152,6 @@
 
 			const handleSessionStarted = async xrSession => {
 				session = xrSession;
-
-				const sensingState = xrSession.updateWorldSensingState({
-					illuminationDetectionState : {
-					   enabled : true
-					}
-				});
 
 				// Create the context where we will render our 3D scene
 				const canvas = document.createElement('canvas');
@@ -227,11 +212,15 @@
 			////////////////
 			// render loop			
 			const handleAnimationFrame = (t, frame) => {
-				updateScene(frame);
-
 				if (!session || session.ended) return;
 
 				session.requestAnimationFrame(handleAnimationFrame);
+
+				frame.getGlobalLightEstimate().then(lightProbe => {
+					const ambientIntensity = lightProbe.indirectIrradiance; // @TODO: Fix me
+					ambientLight.intensity = ambientIntensity;
+					directionalLight.intensity = ambientIntensity * 0.5;
+				});
 
 				const pose = frame.getViewerPose(localReferenceSpace);
 				if (!pose){
