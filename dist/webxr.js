@@ -151,7 +151,7 @@ class XR$1 extends EventTarget {
     }
     return Promise.resolve();
   }
-  async requestSession(mode) {
+  async requestSession(mode, xrSessionInit) {
     if (!this[PRIVATE$1].device) {
       if (mode != 'inline') {
         throw new Error(POLYFILL_REQUEST_SESSION_ERROR);
@@ -159,7 +159,7 @@ class XR$1 extends EventTarget {
         await this[PRIVATE$1].devicePromise;
       }
     }
-    const sessionId = await this[PRIVATE$1].device.requestSession(mode);
+    const sessionId = await this[PRIVATE$1].device.requestSession(mode, xrSessionInit);
     const session = new XRSession(this[PRIVATE$1].device, mode, sessionId);
     if (mode == 'inline') {
       this[PRIVATE$1].inlineSessions.add(session);
@@ -4197,12 +4197,12 @@ class ARKitDevice extends XRDevice {
 	set depthNear(val){ this._depthNear = val; }
 	get depthFar(){ return this._depthFar }
 	set depthFar(val){ this._depthFar = val; }
-	supportsSession(options={}){
-		return !options.hasOwnProperty("immersive") || !options.immersive
+	supportsSession(mode=''){
+		return mode === 'inline' || mode === 'immersive-ar';
 	}
-	async requestSession(options={}){
-		if(!this.supportsSession(options)){
-			console.error('Invalid session options', options);
+	async requestSession(mode='', xrSessionInit={}){
+		if(!this.supportsSession(mode)){
+			console.error('Invalid session mode', mode);
 			return Promise.reject()
 		}
 		if(!this._arKitWrapper){
@@ -4213,15 +4213,20 @@ class ARKitDevice extends XRDevice {
 			console.error('Tried to start a second active session');
 			return Promise.reject()
 		}
+		const requiredFeatures = xrSessionInit.requiredFeatures || [];
+		const optionalFeatures = xrSessionInit.optionalFeatures || [];
 		var ARKitOptions = {};
-		if (options.hasOwnProperty("worldSensing")) {
-			ARKitOptions.worldSensing = options.worldSensing;
+		if (requiredFeatures.indexOf("worldSensing") >= 0 ||
+			optionalFeatures.indexOf("worldSensing") >= 0) {
+			ARKitOptions.worldSensing = true;
 		}
-		if (options.hasOwnProperty("computerVision")) {
-			ARKitOptions.videoFrames = options.useComputerVision;
+		if (requiredFeatures.indexOf("computerVision") >= 0 ||
+			optionalFeatures.indexOf("computerVision") >= 0) {
+			ARKitOptions.videoFrames = true;
 		}
-		if (options.hasOwnProperty("alignEUS")) {
-			ARKitOptions.alignEUS = options.alignEUS;
+		if (requiredFeatures.indexOf("alignEUS") >= 0 ||
+			optionalFeatures.indexOf("alignEUS") >= 0) {
+			ARKitOptions.alignEUS = true;
 		}
 		let initResult = await this._arKitWrapper.waitForInit().then(() => {
 		}).catch((...params) => {
@@ -4229,7 +4234,7 @@ class ARKitDevice extends XRDevice {
 			return Promise.reject()
 		});
 		let watchResult = await this._arKitWrapper.watch(ARKitOptions).then((results) => {
-			const session = new Session(options.outputContext || null);
+			const session = new Session(                             null);
 			this._sessions.set(session.id, session);
 			this._activeSession = session;
 			return Promise.resolve(session.id)
