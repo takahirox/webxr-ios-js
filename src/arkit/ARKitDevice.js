@@ -75,15 +75,13 @@ export default class ARKitDevice extends XRDevice {
 	get depthFar(){ return this._depthFar }
 	set depthFar(val){ this._depthFar = val }
 
-	supportsSession(options={}){
-		// true if:
-		//  not immersive
-		return !options.hasOwnProperty("immersive") || !options.immersive
+	supportsSession(mode=''){
+		return mode === 'inline' || mode === 'immersive-ar';
 	}
 
-	async requestSession(options={}){
-		if(!this.supportsSession(options)){
-			console.error('Invalid session options', options)
+	async requestSession(mode='', xrSessionInit={}){
+		if(!this.supportsSession(mode)){
+			console.error('Invalid session mode', mode)
 			return Promise.reject()
 		}
 		if(!this._arKitWrapper){
@@ -95,15 +93,21 @@ export default class ARKitDevice extends XRDevice {
 			return Promise.reject()
 		}
 
+		const requiredFeatures = xrSessionInit.requiredFeatures || [];
+		const optionalFeatures = xrSessionInit.optionalFeatures || [];
+
 		var ARKitOptions = {}
-		if (options.hasOwnProperty("worldSensing")) {
-			ARKitOptions.worldSensing = options.worldSensing
+		if (requiredFeatures.indexOf("worldSensing") >= 0 ||
+			optionalFeatures.indexOf("worldSensing") >= 0) {
+			ARKitOptions.worldSensing = true;
 		}
-		if (options.hasOwnProperty("computerVision")) {
-			ARKitOptions.videoFrames = options.useComputerVision
+		if (requiredFeatures.indexOf("computerVision") >= 0 ||
+			optionalFeatures.indexOf("computerVision") >= 0) {
+			ARKitOptions.videoFrames = true;
 		}
-		if (options.hasOwnProperty("alignEUS")) {
-			ARKitOptions.alignEUS = options.alignEUS
+		if (requiredFeatures.indexOf("alignEUS") >= 0 ||
+			optionalFeatures.indexOf("alignEUS") >= 0) {
+			ARKitOptions.alignEUS = true;
 		}
 		let initResult = await this._arKitWrapper.waitForInit().then(() => {
 		}).catch((...params) => {
@@ -112,7 +116,9 @@ export default class ARKitDevice extends XRDevice {
 		})
 
 		let watchResult = await this._arKitWrapper.watch(ARKitOptions).then((results) => {
-			const session = new Session(options.outputContext || null)
+			// Note: Commenting out options.outputContext for now because
+			//       I don't know what it's used for.
+			const session = new Session(/*options.outputContext ||*/ null)
 			this._sessions.set(session.id, session)
 			this._activeSession = session
 
