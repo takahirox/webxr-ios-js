@@ -197,7 +197,7 @@
 
 		if (!context) throw new Error('Could not create a webgl context');
 
-		session.nonStandard_setNumberOfTrackedImages(4)
+		session.nonStandard_setNumberOfTrackedImages(4);
 
 		// Set up the base layer
 		session.updateRenderState({baseLayer: new XRWebGLLayer(session, context)});
