@@ -36,11 +36,6 @@
 
 			const coordinatesQueue = [];
 
-			// check session support
-			navigator.xr.supportsSession('inline').catch(err => {
-				console.error('Error', err);
-			});
-
 			document.getElementById('description').addEventListener('touchstart', event => {
 				event.target.style.display = 'none' 
 				event.stopPropagation()
@@ -48,13 +43,19 @@
 
 			document.getElementById('go-button').addEventListener('click', event => {
 				if (!session) {
-					navigator.xr.requestSession('inline')
-						.then(handleSessionStarted)
-						.catch(err => {
-							console.error('Session setup error', err)
-						});
-					document.getElementById('go-button').innerText = 'End';
-					document.getElementById('go-button').style.display = 'none';
+					navigator.xr.isSessionSupported('immersive-ar').then(supported => {
+						if (supported) {
+							navigator.xr.requestSession('immersive-ar')
+								.then(handleSessionStarted)
+								.catch(err => {
+									console.error('Session setup error', err)
+								});
+							document.getElementById('go-button').innerText = 'End';
+							document.getElementById('go-button').style.display = 'none';
+						} else {
+							throw new Error('No immersive-ar support');
+						}
+					});
 				} else {
 					session.end();
 					session = null;
