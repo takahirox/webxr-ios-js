@@ -75,12 +75,12 @@ export default class ARKitDevice extends XRDevice {
 	get depthFar(){ return this._depthFar }
 	set depthFar(val){ this._depthFar = val }
 
-	supportsSession(mode=''){
+	isSessionSupported(mode=''){
 		return mode === 'inline' || mode === 'immersive-ar';
 	}
 
 	async requestSession(mode='', xrSessionInit={}){
-		if(!this.supportsSession(mode)){
+		if(!this.isSessionSupported(mode)){
 			console.error('Invalid session mode', mode)
 			return Promise.reject()
 		}
