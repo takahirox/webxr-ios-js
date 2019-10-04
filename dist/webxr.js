@@ -4172,9 +4172,13 @@ class ARKitDevice extends XRDevice {
 		this._activeSession = null;
 		this._wrapperDiv = document.createElement('div');
 		this._wrapperDiv.setAttribute('class', 'arkit-device-wrapper');
-		document.addEventListener('DOMContentLoaded', ev => {
+		if (document.body) {
 			document.body.insertBefore(this._wrapperDiv, document.body.firstChild || null);
-		});
+		} else {
+			document.addEventListener('DOMContentLoaded', ev => {
+				document.body.insertBefore(this._wrapperDiv, document.body.firstChild || null);
+			});
+		}
 		this._headModelMatrix = create$14();
 		this._projectionMatrix = create$14();
 		this._eyeLevelMatrix = identity$9(create$14());
