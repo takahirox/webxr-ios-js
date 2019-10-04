@@ -284,7 +284,7 @@
 		if (!session) {
 			navigator.xr.isSessionSupported('immersive-ar').then(supported => {
 				if (supported) {
-					navigator.xr.requestSession('inline', {
+					navigator.xr.requestSession('immersive-ar', {
 						requiredFeatures: ['worldSensing']
 					})
 					.then(handleSessionStarted)
