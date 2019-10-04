@@ -8,7 +8,7 @@
 		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 		<script src="../libs/three/three.min.js"></script>
 		<script src="../libs/three/loaders/GLTFLoader.js"></script>
- 		<script module src="../../dist/webxr.js"></script>
+		<script module src="../../xrshim.js"></script>
 		<link rel="stylesheet" href="../common.css"/>
 	</head>
 	<body>
@@ -110,6 +110,8 @@
 				});
 
 				if (!context) throw new Error('Could not create a webgl context');
+
+	
 
 				// Set up the base layer
 				session.updateRenderState({baseLayer: new XRWebGLLayer(session, context)});
