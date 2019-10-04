@@ -26,9 +26,14 @@ export default class ARKitDevice extends XRDevice {
 		// A div prepended to body children that will contain the session layer
 		this._wrapperDiv = document.createElement('div')
 		this._wrapperDiv.setAttribute('class', 'arkit-device-wrapper')
-		document.addEventListener('DOMContentLoaded', ev => {
+
+		if (document.body) {
 			document.body.insertBefore(this._wrapperDiv, document.body.firstChild || null)
-		})
+		} else {
+			document.addEventListener('DOMContentLoaded', ev => {
+				document.body.insertBefore(this._wrapperDiv, document.body.firstChild || null)
+			})
+		}
 
 		this._headModelMatrix = mat4.create() // Model and view matrix are the same
 		this._projectionMatrix = mat4.create()
