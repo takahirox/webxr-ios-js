@@ -4431,7 +4431,7 @@ async function _xrSessionRequestHitTest(direction, referenceSpace, frame) {
 			this.requestReferenceSpace('local').then(localReferenceSpace => {
 				copy$14(_workingMatrix, frame.getPose(referenceSpace, localReferenceSpace).transform.matrix);
 				resolve(hits.map(hit => {
-					multiply$14(_workingMatrix2, hit.world_transform, _workingMatrix);
+					multiply$14(_workingMatrix2, _workingMatrix, hit.world_transform);
 					return new XRHitResult(_workingMatrix2, hit, _arKitWrapper._timestamp)
 				}));
 			}).catch((...params) => {
@@ -4525,9 +4525,7 @@ function _installExtensions(){
 		Object.defineProperty(XRFrame.prototype, 'worldInformation', { get: _getWorldInformation });
 		XRFrame.prototype._getPose = window.XRFrame.prototype.getPose;
 		XRFrame.prototype.getPose = function (space, baseSpace) {
-			if (
-				space._specialType === 'target-ray' ||
-				space._specialType === 'grip') {
+			if (space._specialType === 'target-ray' || space._specialType === 'grip') {
 				return this._getPose(space, baseSpace);
 			}
 			copy$14(_workingMatrix, this.getViewerPose(baseSpace).transform.matrix);
