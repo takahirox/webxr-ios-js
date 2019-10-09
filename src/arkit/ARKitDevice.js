@@ -202,7 +202,7 @@ export default class ARKitDevice extends XRDevice {
 						resolve(that._eyeLevelMatrix) 
 					})
 					return
-				case 'stage':
+				case 'stage': // @TODO: Update
 					//return that._stageMatrix
 					reject(new Error('stage not supported', type))
 				default:
