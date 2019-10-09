@@ -63,7 +63,7 @@
 
 					// convert hit matrices from head to eye level coordinate systems
 					mat4.copy(workingMatrix, frame.getPose(localReferenceSpace, viewerReferenceSpace).transform.matrix);
-					mat4.multiply(workingMatrix, hit.hitMatrix, workingMatrix);
+					mat4.multiply(workingMatrix, workingMatrix, hit.hitMatrix);
 
 					reticleParent.matrix.fromArray(workingMatrix);
 					reticleParent.visible = true;   // it starts invisible

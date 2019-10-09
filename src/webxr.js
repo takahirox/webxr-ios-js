@@ -104,7 +104,7 @@ async function _xrSessionRequestHitTest(direction, referenceSpace, frame) {
 				mat4.copy(_workingMatrix, frame.getPose(referenceSpace, localReferenceSpace).transform.matrix);
 				//console.log('eye to head', mat4.getTranslation(vec3.create(), csTransform), mat4.getRotation(new Float32Array(4), csTransform))
 				resolve(hits.map(hit => {
-					mat4.multiply(_workingMatrix2, hit.world_transform, _workingMatrix);
+					mat4.multiply(_workingMatrix2, _workingMatrix, hit.world_transform);
 					//console.log('world transform', mat4.getTranslation(vec3.create(), hit.world_transform), mat4.getRotation(new Float32Array(4), hit.world_transform))
 					//console.log('head transform', mat4.getTranslation(vec3.create(), hitInHeadMatrix), mat4.getRotation(new Float32Array(4), hitInHeadMatrix))
 					return new XRHitResult(_workingMatrix2, hit, _arKitWrapper._timestamp)
@@ -303,13 +303,11 @@ function _installExtensions(){
 		Object.defineProperty(XRFrame.prototype, 'worldInformation', { get: _getWorldInformation });
 
 		// Note: WebXR polyfill doesn't support XRFrame.getPose() for
-		//       non viewer/target-ray/grip space yet (09/24/2019).
+		//       non target-ray/grip spaces yet (09/24/2019).
 		//       So supporting by ourselves for now.
 		XRFrame.prototype._getPose = window.XRFrame.prototype.getPose;
 		XRFrame.prototype.getPose = function (space, baseSpace) {
-			if (/*space._specialType === 'viewer' ||*/ // Note: seems like polyfill works wrongly for viewer?
-				space._specialType === 'target-ray' ||
-				space._specialType === 'grip') {
+			if (space._specialType === 'target-ray' || space._specialType === 'grip') {
 				return this._getPose(space, baseSpace);
 			}
 
