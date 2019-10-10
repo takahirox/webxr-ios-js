@@ -4172,12 +4172,13 @@ class ARKitDevice extends XRDevice {
 		this._activeSession = null;
 		this._wrapperDiv = document.createElement('div');
 		this._wrapperDiv.setAttribute('class', 'arkit-device-wrapper');
-		if (document.body) {
+		const insertWrapperDiv = () => {
 			document.body.insertBefore(this._wrapperDiv, document.body.firstChild || null);
+		};
+		if (document.body) {
+			insertWrapperDiv();
 		} else {
-			document.addEventListener('DOMContentLoaded', ev => {
-				document.body.insertBefore(this._wrapperDiv, document.body.firstChild || null);
-			});
+			document.addEventListener('DOMContentLoaded', ev => insertWrapperDiv);
 		}
 		this._headModelMatrix = create$14();
 		this._projectionMatrix = create$14();
@@ -4217,10 +4218,10 @@ class ARKitDevice extends XRDevice {
 	set depthNear(val){ this._depthNear = val; }
 	get depthFar(){ return this._depthFar }
 	set depthFar(val){ this._depthFar = val; }
-	isSessionSupported(mode=''){
+	isSessionSupported(mode){
 		return mode === 'inline' || mode === 'immersive-ar';
 	}
-	async requestSession(mode='', xrSessionInit={}){
+	async requestSession(mode, xrSessionInit={}){
 		if(!this.isSessionSupported(mode)){
 			console.error('Invalid session mode', mode);
 			return Promise.reject()
