@@ -4528,10 +4528,17 @@ function _installExtensions(){
 			if (space._specialType === 'target-ray' || space._specialType === 'grip') {
 				return this._getPose(space, baseSpace);
 			}
-			copy$14(_workingMatrix, this.getViewerPose(baseSpace).transform.matrix);
-			invert$9(_workingMatrix2, this.getViewerPose(space).transform.matrix);
-			const resultMatrix = create$14();
-			multiply$14(resultMatrix, _workingMatrix, _workingMatrix2);
+			const baseSpaceViewerPose = this.getViewerPose(baseSpace);
+			if (!baseSpaceViewerPose) {
+				return null;
+			}
+			copy$14(_workingMatrix, baseSpaceViewerPose.transform.matrix);
+			const spaceViewerPose = this.getViewerPose(space);
+			if (!spaceViewerPose) {
+				return null;
+			}
+			invert$9(_workingMatrix2, spaceViewerPose.transform.matrix);
+			const resultMatrix = multiply$14(create$14(), _workingMatrix, _workingMatrix2);
 			return new XRPose(
 				new XRRigidTransform(resultMatrix),
 				false
