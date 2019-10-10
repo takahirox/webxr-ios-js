@@ -302,23 +302,46 @@ function _installExtensions(){
 	if(window.XRFrame) {
 		Object.defineProperty(XRFrame.prototype, 'worldInformation', { get: _getWorldInformation });
 
-		// Note: WebXR polyfill doesn't support XRFrame.getPose() for
-		//       non target-ray/grip spaces yet (09/24/2019).
-		//       So supporting by ourselves for now.
+		// Note: The official WebXR polyfill doesn't support XRFrame.getPose() for
+		//       non target-ray/grip space yet (09/24/2019).
+		//       So supporting by ourselves here for now.
 		XRFrame.prototype._getPose = window.XRFrame.prototype.getPose;
 		XRFrame.prototype.getPose = function (space, baseSpace) {
 			if (space._specialType === 'target-ray' || space._specialType === 'grip') {
 				return this._getPose(space, baseSpace);
 			}
 
-			// Assuming both baseSpace and space are XRReferenceSpace.
-			// @TODO: Support XRSpace
+			// @TODO: More proper handling
+			//   - Error handling
+			//   - Support XRSpace. Assuming the both spaces are XRReferenceSpace for now
+			//   - Check whether poses must be limited. Assuming it's false for now
+			//   - Support emulatedPosition true case. Assuming it's false for now
+			// See https://immersive-web.github.io/webxr/#populate-the-pose
 
-			mat4.copy(_workingMatrix, this.getViewerPose(baseSpace).transform.matrix);
-			mat4.invert(_workingMatrix2, this.getViewerPose(space).transform.matrix);
+			const baseSpaceViewerPose = this.getViewerPose(baseSpace);
 
-			const resultMatrix = mat4.create();
-			mat4.multiply(resultMatrix, _workingMatrix, _workingMatrix2); 
+			if (!baseSpaceViewerPose) {
+				return null;
+			}
+
+			// Note: Currently (10/10/2019) the official WebXR polyfill
+			//       always returns the same XRViewerPose instance from
+			//       .getViewerPose() of a XRFrame instance.
+			//       So we need to copy the matrix before calling the next
+			//       .getViewerPose().
+			//       See https://github.com/immersive-web/webxr-polyfill/issues/97
+
+			mat4.copy(_workingMatrix, baseSpaceViewerPose.transform.matrix);
+
+			const spaceViewerPose = this.getViewerPose(space);
+
+			if (!spaceViewerPose) {
+				return null;
+			}
+
+			mat4.invert(_workingMatrix2, spaceViewerPose.transform.matrix);
+
+			const resultMatrix = mat4.multiply(mat4.create(), _workingMatrix, _workingMatrix2);
 
 			return new XRPose(
 				new XRRigidTransform(resultMatrix),
