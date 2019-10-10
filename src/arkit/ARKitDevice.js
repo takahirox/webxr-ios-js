@@ -27,12 +27,14 @@ export default class ARKitDevice extends XRDevice {
 		this._wrapperDiv = document.createElement('div')
 		this._wrapperDiv.setAttribute('class', 'arkit-device-wrapper')
 
+		const insertWrapperDiv = () => {
+			document.body.insertBefore(this._wrapperDiv, document.body.firstChild || null);
+		};
+
 		if (document.body) {
-			document.body.insertBefore(this._wrapperDiv, document.body.firstChild || null)
+			insertWrapperDiv();
 		} else {
-			document.addEventListener('DOMContentLoaded', ev => {
-				document.body.insertBefore(this._wrapperDiv, document.body.firstChild || null)
-			})
+			document.addEventListener('DOMContentLoaded', ev => insertWrapperDiv);
 		}
 
 		this._headModelMatrix = mat4.create() // Model and view matrix are the same
@@ -80,11 +82,11 @@ export default class ARKitDevice extends XRDevice {
 	get depthFar(){ return this._depthFar }
 	set depthFar(val){ this._depthFar = val }
 
-	isSessionSupported(mode=''){
+	isSessionSupported(mode){
 		return mode === 'inline' || mode === 'immersive-ar';
 	}
 
-	async requestSession(mode='', xrSessionInit={}){
+	async requestSession(mode, xrSessionInit={}){
 		if(!this.isSessionSupported(mode)){
 			console.error('Invalid session mode', mode)
 			return Promise.reject()
@@ -231,7 +233,7 @@ export default class ARKitDevice extends XRDevice {
 		target.y = 0
 		target.width = offsetWidth
 		target.height = offsetHeight
-		return true 
+		return true
 	}
 
 	getProjectionMatrix(eye){
