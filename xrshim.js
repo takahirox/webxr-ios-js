@@ -1,9 +1,11 @@
-const REALAPI_URL = 'https://raw.githack.com/takahirox/webxr-ios-js/PolyfillUpdateWIP/dist/webxr.js';
+const REALAPI_URL = '../../dist/webxr.js';
 
 // @TODO: Delete FakeXR class definition when the polyfill is loaded (possible?)
 class FakeXR {
 	isSessionSupported(mode) {
-		return Promise.resolve(mode === 'inline' || mode === 'immersive-ar');
+		// Note: We support only immersive-ar mode for now.
+		//       See https://github.com/MozillaReality/webxr-ios-js/pull/34#discussion_r334910337
+		return Promise.resolve(mode === 'immersive-ar');
 	}
 	requestSession(mode, opts) {
 		console.log("going to load from ", REALAPI_URL)
