@@ -4219,7 +4219,7 @@ class ARKitDevice extends XRDevice {
 	get depthFar(){ return this._depthFar }
 	set depthFar(val){ this._depthFar = val; }
 	isSessionSupported(mode){
-		return mode === 'inline' || mode === 'immersive-ar';
+		return mode === 'immersive-ar';
 	}
 	async requestSession(mode, xrSessionInit={}){
 		if(!this.isSessionSupported(mode)){
@@ -4255,7 +4255,7 @@ class ARKitDevice extends XRDevice {
 			return Promise.reject()
 		});
 		let watchResult = await this._arKitWrapper.watch(ARKitOptions).then((results) => {
-			const session = new Session(                             null);
+			const session = new Session();
 			this._sessions.set(session.id, session);
 			this._activeSession = session;
 			return Promise.resolve(session.id)
@@ -4308,8 +4308,11 @@ class ARKitDevice extends XRDevice {
 						resolve(that._eyeLevelMatrix);
 					});
 					return
-				case 'stage':
-					reject(new Error('stage not supported', type));
+				case 'local-floor':
+				case 'bounded-floor':
+				case 'unbounded':
+					reject(new Error('not supported', type));
+					return
 				default:
 					reject(new Error('Unsupported frame of reference type', type));
 			}
@@ -4378,9 +4381,8 @@ class ARKitDevice extends XRDevice {
 }
 let SESSION_ID = 100;
 class Session {
-	constructor(outputContext){
+	constructor(){
 		this.ended = null;
-		this.outputContext = outputContext;
 		this.baseLayer = null;
 		this.id = ++SESSION_ID;
 	}
@@ -4508,6 +4510,18 @@ function _installExtensions(){
 	if(!navigator.xr) return
 	_arKitWrapper = ARKitWrapper.GetOrCreate();
 	ARKitDevice.initStyles();
+	if(window.XR) {
+		XR.prototype._isSessionSupported = XR.prototype.isSessionSupported;
+		XR.prototype._requestSession = XR.prototype.requestSession;
+		XR.prototype.isSessionSupported = function (mode) {
+			if (mode !== 'immersive-ar') return Promise.resolve(false);
+			return this._isSessionSupported(mode);
+		};
+		XR.prototype.requestSession = function (mode, xrSessionInit) {
+			if (mode !== 'immersive-ar') Promise.reject(new DOMException('Polyfill Error: only immersive-ar mode is supported.'));
+			return this._requestSession(mode, xrSessionInit);
+		};
+	}
 	if(window.XRSession){
 		XRSession.prototype.requestHitTest = _xrSessionRequestHitTest;
 		XRSession.prototype.updateWorldSensingState = _updateWorldSensingState;
